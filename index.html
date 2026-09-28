@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cobrança Offline</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui,sans-serif}
+        body{background:#f9fafb;padding:1rem;max-width:48rem;margin:0 auto}
+        h1{color:#2563eb;margin-bottom:1rem}
+        .abas{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+        .aba{padding:.75rem 1rem;border:none;border-radius:.5rem;background:#e5e7eb;cursor:pointer}
+        .aba.ativa{background:#2563eb;color:#fff}
+        .pagina{display:none}
+        .pagina.ativa{display:block}
+        .card{background:#fff;border-radius:.75rem;padding:1.25rem;margin-bottom:1rem;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+        input,button,select{padding:.75rem;border:1px solid #d1d5db;border-radius:.5rem;font-size:1rem;margin:.3rem 0;width:100%}
+        button{background:#2563eb;color:#fff;border:none;cursor:pointer}
+        button.sucesso{background:#16a34a}
+        button.perigo{background:#dc2626}
+        .item{padding:.75rem;border-bottom:1px solid #e5e7eb;cursor:pointer}
+        .item:hover{background:#f3f4f6}
+        .linha{display:flex;justify-content:space-between;margin:.25rem 0}
+        .etq{font-weight:600}
+        .ok{background:#dcfce7;padding:.5rem;border-radius:.3rem;margin:.5rem 0;color:#166534}
+        .erro{background:#fee2e2;padding:.5rem;border-radius:.3rem;margin:.5rem 0;color:#991b1b}
+        .oculto{display:none!important}
+    </style>
+</head>
+<body>
+    <h1>📋 Cobrança Offline</h1>
+    <div id="mensagem"></div>
+
+    <div class="abas">
+        <button class="aba ativa" data-pag="clientes">Clientes</button>
+        <button class="aba" data-pag="cobradores">Cobradores</button>
+        <button class="aba" data-pag="ficha">Ficha</button>
+    </div>
+
+    <!-- CLIENTES -->
+    <div class="pagina ativa" id="pag-clientes">
+        <div class="card">
+            <h3>Cadastrar Cliente</h3>
+            <input type="text" id="c-nome" placeholder="Nome">
+            <input type="text" id="c-end" placeholder="Endereço">
+            <input type="tel" id="c-tel" placeholder="Telefone">
+            <select id="c-cob">
+                <option value="">— Sem cobrador —</option>
+            </select>
+            <button onclick="novoCliente()">✅ Salvar Cliente</button>
+        </div>
+        <div class="card">
+            <h3>Clientes (<span id="total-cli">0</span>)</h3>
+            <div id="lista-cli"></div>
+        </div>
+    </div>
+
+    <!-- COBRADORES -->
+    <div class="pagina" id="pag-cobradores">
+        <div class="card">
+            <h3>Cadastrar Cobrador</h3>
+            <input type="text" id="co-nome" placeholder="Nome">
+            <input type="tel" id="co-tel" placeholder="Telefone">
+            <button onclick="novoCobrador()">✅ Salvar Cobrador</button>
+        </div>
+        <div class="card">
+            <h3>Cobradores (<span id="total-co">0</span>)</h3>
+            <div id="lista-co"></div>
+        </div>
+    </div>
+
+    <!-- FICHA -->
+    <div class="pagina" id="pag-ficha">
+        <div class="card" id="vazio">
+            <p style="color:#6b7280;text-align:center">Selecione um cliente na lista</p>
+        </div>
+        <div id="dados-ficha" class="oculto">
+            <div class="card">
+                <h3 id="f-nome"></h3>
+                <p>Endereço: <span id="f-end"></span></p>
+                <p>Telefone: <span id="f-tel"></span></p>
+                <p>Cobrador: <span id="f-cob"></span></p>
+                <p style="font-weight:bold;margin-top:.5rem">Saldo: <span id="f-saldo" style="color:#dc2626"></span></p>
+            </div>
+            <div class="card">
+                <h4>Enchimento</h4>
+                <input type="date" id="enche-data">
+                <input type="number" step="0.01" id="enche-valor" placeholder="Valor R$">
+                <button onclick="addEnchimento()">Adicionar</button>
+            </div>
+            <div class="card">
+                <h4>Pagamento</h4>
+                <input type="date" id="pag-data">
+                <input type="number" step="0.01" id="pag-valor" placeholder="Valor R$">
+                <button class="sucesso" onclick="addPagamento()">Receber</button>
+            </div>
+            <div class="card">
+                <h4>Histórico</h4>
+                <div id="hist"></div>
+            </div>
+            <button class="perigo" onclick="voltar()">Voltar</button>
+        </div>
+    </div>
+
+<script>
+// FUNÇÕES DE SALVAMENTO - SIMPLES E GARANTIDAS
+function mostrarMensagem(texto, tipo){
+    const m = document.getElementById('mensagem')
+    m.className = tipo
+    m.textContent = texto
+    setTimeout(()=>m.textContent='', 3000)
+}
+
+function salvar(){
+    try{
+        localStorage.setItem('dados_app', JSON.stringify({
+            clientes: bd.clientes,
+            cobradores: bd.cobradores
+        }))
+        mostrarMensagem('✅ Salvo com sucesso!', 'ok')
+        return true
+    }catch(e){
+        mostrarMensagem('❌ Erro: ' + e.message, 'erro')
+        return false
+    }
+}
+
+function carregar(){
+    try{
+        const tudo = localStorage.getItem('dados_app')
+        if(tudo){
+            const d = JSON.parse(tudo)
+            bd.clientes = d.clientes || []
+            bd.cobradores = d.cobradores || []
+            console.log('Carregado:', bd.clientes.length, 'clientes')
+        }
+    }catch(e){
+        bd.clientes = []
+        bd.cobradores = []
+    }
+}
+
+// BANCO DE DADOS
+const bd = {
+    clientes: [],
+    cobradores: [],
+    selecionado: null
+}
+
+// INICIALIZAR
+carregar()
+document.querySelectorAll('input[type="date"]').forEach(i=>i.valueAsDate=new Date())
+
+// NAVEGAÇÃO
+document.querySelectorAll('.aba').forEach(b=>{
+    b.onclick = () => {
+        document.querySelectorAll('.aba').forEach(a=>a.classList.remove('ativa'))
+        document.querySelectorAll('.pagina').forEach(p=>p.classList.remove('ativa'))
+        b.classList.add('ativa')
+        document.getElementById('pag-' + b.dataset.pag).classList.add('ativa')
+    }
+})
+
+// ATUALIZAR LISTA DE COBRADORES NO SELECT
+function atualizarSelect(){
+    const s = document.getElementById('c-cob')
+    s.innerHTML = '<option value="">— Sem cobrador —</option>'
+    bd.cobradores.forEach(c=>s.innerHTML += `<option value="${c.id}">${c.nome}</option>`)
+}
+
+// NOVO COBRADOR
+function novoCobrador(){
+    const n = document.getElementById('co-nome').value.trim()
+    const t = document.getElementById('co-tel').value.trim()
+    if(!n) return alert('Digite o nome')
+    bd.cobradores.push({id:Date.now(), nome:n, tel:t})
+    if(salvar()){
+        document.getElementById('co-nome').value = ''
+        document.getElementById('co-tel').value = ''
+        listarCobradores()
+        atualizarSelect()
+    }
+}
+
+function listarCobradores(){
+    const l = document.getElementById('lista-co')
+    l.innerHTML = ''
+    document.getElementById('total-co').textContent = bd.cobradores.length
+    bd.cobradores.forEach(c=>{
+        l.innerHTML += `<div class="item"><b>${c.nome}</b> — ${c.tel || 'Sem telefone'}</div>`
+    })
+}
+
+// NOVO CLIENTE
+function novoCliente(){
+    const n = document.getElementById('c-nome').value.trim()
+    const e = document.getElementById('c-end').value.trim()
+    const t = document.getElementById('c-tel').value.trim()
+    const cob = document.getElementById('c-cob').value
+    if(!n) return alert('Digite o nome do cliente!')
+    
+    bd.clientes.push({
+        id: Date.now(),
+        nome: n,
+        endereco: e,
+        telefone: t,
+        cobradorId: cob ? Number(cob) : null,
+        enchimentos: [],
+        pagamentos: [],
+        saldo: 0
+    })
+    
+    if(salvar()){
+        console.log('Cliente cadastrado. Total:', bd.clientes.length)
+        document.getElementById('c-nome').value = ''
+        document.getElementById('c-end').value = ''
+        document.getElementById('c-tel').value = ''
+        listarClientes()
+    }
+}
+
+function listarClientes(){
+    const l = document.getElementById('lista-cli')
+    l.innerHTML = ''
+    document.getElementById('total-cli').textContent = bd.clientes.length
+    
+    if(bd.clientes.length === 0){
+        l.innerHTML = '<p style="color:#6b7280;padding:.5rem">Nenhum cliente cadastrado</p>'
+        return
+    }
+    
+    bd.clientes.forEach(c=>{
+        const nomeCob = bd.cobradores.find(x=>x.id===c.cobradorId)
+        l.innerHTML += `<div class="item" onclick="abrirFicha(${c.id})">
+            <div class="linha"><b>${c.nome}</b> <span style="color:${c.saldo>0?'#dc2626':'#16a34a'}">R$ ${c.saldo.toFixed(2)}</span></div>
+            <div style="font-size:.9rem;color:#666">${nomeCob?nomeCob.nome:'Sem cobrador'}</div>
+        </div>`
+    })
+}
+
+function abrirFicha(id){
+    bd.selecionado = bd.clientes.find(c=>c.id===id)
+    document.getElementById('vazio').classList.add('oculto')
+    document.getElementById('dados-ficha').classList.remove('oculto')
+    document.querySelectorAll('.aba')[2].click()
+    carregarFicha()
+}
+
+function carregarFicha(){
+    const c = bd.selecionado
+    const cob = bd.cobradores.find(x=>x.id===c.cobradorId)
+    document.getElementById('f-nome').textContent = c.nome
+    document.getElementById('f-end').textContent = c.endereco || '—'
+    document.getElementById('f-tel').textContent = c.telefone || '—'
+    document.getElementById('f-cob').textContent = cob ? cob.nome : 'Não definido'
+    document.getElementById('f-saldo').textContent = 'R$ ' + c.saldo.toFixed(2)
+    carregarHistorico()
+}
+
+function addEnchimento(){
+    const c = bd.selecionado
+    const data = document.getElementById('enche-data').value
+    const valor = parseFloat(document.getElementById('enche-valor').value)
+    if(!valor) return alert('Informe o valor')
+    c.enchimentos.push({data, valor})
+    c.saldo += valor
+    if(salvar()){
+        document.getElementById('enche-valor').value = ''
+        carregarFicha()
+        listarClientes()
+    }
+}
+
+function addPagamento(){
+    const c = bd.selecionado
+    const data = document.getElementById('pag-data').value
+    const valor = parseFloat(document.getElementById('pag-valor').value)
+    if(!valor) return alert('Informe o valor')
+    if(valor > c.saldo) return alert('Valor maior que o saldo!')
+    c.pagamentos.push({data, valor})
+    c.saldo -= valor
+    if(salvar()){
+        document.getElementById('pag-valor').value = ''
+        carregarFicha()
+        listarClientes()
+    }
+}
+
+function carregarHistorico(){
+    const c = bd.selecionado
+    let todos = []
+    c.enchimentos.forEach(e=>todos.push({t:'🛢️ Enchimento',d:e.data,v:e.valor}))
+    c.pagamentos.forEach(p=>todos.push({t:'✅ Pagamento',d:p.data,v:p.valor}))
+    todos.sort((a,b)=>new Date(b.d) - new Date(a.d))
+    
+    const h = document.getElementById('hist')
+    h.innerHTML = ''
+    if(todos.length === 0){h.innerHTML='<p style="color:#666">Sem registros</p>';return}
+    todos.forEach(x=>{
+        h.innerHTML += `<div style="padding:.5rem 0;border-bottom:1px solid #eee">
+            <b>${x.t}</b> — ${x.d}<br>
+            Valor: R$ ${x.v.toFixed(2)}
+        </div>`
+    })
+}
+
+function voltar(){
+    bd.selecionado = null
+    document.getElementById('vazio').classList.remove('oculto')
+    document.getElementById('dados-ficha').classList.add('oculto')
+    document.querySelectorAll('.aba')[0].click()
+}
+
+// INICIAR TUDO
+atualizarSelect()
+listarCobradores()
+listarClientes()
+</script>
+</body>
+</html>
